@@ -1,0 +1,575 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LithoShield AI // Geological Command & Exploration Dashboard</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        :root {
+            --bg-rain: linear-gradient(135deg, #060d13 0%, #0b1a24 50%, #102633 100%);
+            --bg-card: rgba(11, 26, 36, 0.85);
+            --accent-cyan: #00f2fe;
+            --accent-marine: #38ef7d;
+            --accent-amber: #ff9f43;
+            --accent-crimson: #ff4757;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: rgba(0, 242, 254, 0.15);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background: var(--bg-rain);
+            background-attachment: fixed;
+            color: var(--text-main);
+            overflow-x: hidden;
+            line-height: 1.6;
+            padding-bottom: 5rem;
+        }
+
+        header {
+            background-color: rgba(6, 13, 19, 0.95);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .logo { font-weight: 800; font-size: 1.4rem; letter-spacing: 1px; color: #fff; }
+        .logo span { color: var(--accent-cyan); }
+
+        .cloud-badge {
+            background: rgba(0, 242, 254, 0.1);
+            border: 1px solid var(--accent-cyan);
+            color: var(--accent-cyan);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        .dashboard-grid {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 992px) {
+            .dashboard-grid { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            margin-bottom: 1.5rem;
+        }
+
+        .panel-title {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--accent-cyan);
+            margin-bottom: 1rem;
+            font-weight: 700;
+            border-bottom: 1px solid rgba(0, 242, 254, 0.2);
+            padding-bottom: 0.4rem;
+        }
+
+        .input-field {
+            width: 100%;
+            background: rgba(4, 10, 15, 0.9) !important;
+            border: 1px solid rgba(0, 242, 254, 0.4);
+            padding: 12px;
+            border-radius: 6px;
+            color: #ffffff !important;
+            font-family: monospace;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+            outline: none;
+            display: block;
+        }
+
+        .input-field:focus {
+            border-color: var(--accent-marine);
+            box-shadow: 0 0 8px rgba(56, 239, 125, 0.3);
+        }
+
+        .select-field {
+            width: 100%;
+            background: #0b1a24;
+            border: 1px solid rgba(0, 242, 254, 0.3);
+            padding: 10px;
+            border-radius: 6px;
+            color: #fff;
+            margin-bottom: 1rem;
+            outline: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--accent-cyan), #00b4db);
+            color: #060d13;
+            border: none;
+            padding: 0.85rem 1rem;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: transform 0.2s, opacity 0.2s;
+            margin-top: 0.5rem;
+        }
+
+        .btn:hover { transform: translateY(-1px); opacity: 0.95; }
+
+        #map {
+            width: 100%;
+            height: 250px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin-bottom: 1rem;
+            background: #040a0f;
+            z-index: 1;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .metric-card {
+            background: rgba(4, 10, 15, 0.5);
+            border: 1px solid var(--border);
+            padding: 1.25rem;
+            border-radius: 8px;
+        }
+
+        .metric-val { font-size: 1.2rem; font-weight: bold; margin-top: 0.5rem; color: #fff; }
+
+        .canvas-container {
+            width: 100%;
+            background: #020609;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            padding: 12px;
+            display: flex;
+            justify-content: center;
+        }
+
+        canvas {
+            width: 100%;
+            height: auto;
+            max-height: 220px;
+            background-color: #000;
+        }
+
+        .legend-bar {
+            height: 12px;
+            width: 100%;
+            background: linear-gradient(to right, #0022ff, #00ffcc, #77ff00, #ffff00, #ff7700, #ff0000, #aa00ff);
+            border-radius: 3px;
+            margin: 10px 0 5px 0;
+        }
+
+        .material-tag {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin: 4px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .fluid-oil { border-color: var(--accent-amber); color: var(--accent-amber); }
+        .fluid-water { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+        .hazard-gas { border-color: var(--accent-crimson); color: var(--accent-crimson); }
+
+        /* Rock Section Layout Custom Enhancements */
+        .rock-section-title {
+            max-width: 1400px;
+            margin: 3rem auto 1rem auto;
+            padding: 0 1.5rem;
+            border-left: 4px solid var(--accent-marine);
+        }
+
+        .rock-grid {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .rock-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+            transition: transform 0.3s;
+        }
+
+        .rock-card:hover { transform: translateY(-4px); border-color: rgba(56, 239, 125, 0.4); }
+
+        .rock-image-container {
+            height: 180px;
+            width: 100%;
+            overflow: hidden;
+            position: relative;
+            background: #111;
+        }
+
+        .rock-image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s;
+        }
+
+        .rock-card:hover .rock-image-container img {
+            transform: scale(1.05);
+        }
+
+        .rock-info { padding: 1.25rem; }
+        .rock-type-badge {
+            font-size: 0.65rem;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 3px;
+            text-transform: uppercase;
+            float: right;
+        }
+
+        .use-box {
+            margin-top: 10px;
+            background: rgba(0,0,0,0.2);
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            border-left: 2px solid var(--accent-marine);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">LITHO<span>SHIELD</span> AI</div>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <div class="cloud-badge">Geological Baseline Pipeline</div>
+            <div id="clock" style="font-family: monospace; color: var(--text-muted); font-size: 0.85rem;">00:00:00 UTC</div>
+        </div>
+    </header>
+
+    <div class="dashboard-grid">
+        
+        <div class="control-panel">
+            
+            <div class="card">
+                <div class="panel-title">Your Spatial Profile</div>
+                <label style="font-size: 0.75rem; color: var(--text-muted); display:block; margin-bottom:4px;">Current Observer Location</label>
+                <input type="text" id="myLocationName" value="Warri Base Station" class="input-field">
+                
+                <label style="font-size: 0.75rem; color: var(--text-muted); display:block; margin-bottom:4px;">Observer Coordinates</label>
+                <input type="text" id="myCoords" value="5.5241, 5.7501" class="input-field">
+            </div>
+
+            <div class="card">
+                <div class="panel-title">Target Environment Model</div>
+                <label style="font-size: 0.75rem; color: var(--text-muted); display:block; margin-bottom:4px;">Select Target Field Sector</label>
+                <select id="environmentSelect" class="select-field" onchange="updatePresetLocation()">
+                    <option value="niger">Niger Delta Basin (Onshore Block B)</option>
+                    <option value="gulf">Gulf of Guinea (Offshore Sector A)</option>
+                    <option value="anambra">Anambra Basin (Sedimentary Infill)</option>
+                </select>
+
+                <label style="font-size: 0.75rem; color: var(--text-muted); display:block; margin-bottom:4px;">Target Decimal Lat, Long</label>
+                <input type="text" id="targetCoords" value="5.3100, 6.4400" class="input-field" placeholder="e.g. 5.3100, 6.4400">
+                
+                <button class="btn" onclick="executeGeologicalInversion()">Run Exploration Scan</button>
+            </div>
+
+            <div class="card" style="padding: 1rem;">
+                <div class="panel-title" style="margin-bottom: 0.5rem;">Target GIS Mapping</div>
+                <div id="map"></div>
+            </div>
+
+        </div>
+
+        <div class="main-viewport">
+            
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="panel-title" style="color:var(--text-muted);">Target Environment</div>
+                    <div class="metric-val" id="meta-env">Niger Delta Basin</div>
+                </div>
+                <div class="metric-card">
+                    <div class="panel-title" style="color:var(--text-muted);">Detected Geofluid / Strata</div>
+                    <div class="metric-val" id="meta-material" style="color: var(--accent-amber);">Freshwater Aquifers</div>
+                </div>
+                <div class="metric-card">
+                    <div class="panel-title" style="color:var(--text-muted);">Scan Status</div>
+                    <div class="metric-val" id="scan-status" style="color: var(--accent-marine);">Ready for Data Stream</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="panel-title">Lithological Strata & Environmental Compositions</div>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+                    Predicted matrix materials and fluid distributions within the scanned coordinate window boundaries:
+                </p>
+                <div id="materialsContainer">
+                    <span class="material-tag fluid-water">■ Freshwater Aquifers</span>
+                    <span class="material-tag fluid-oil">■ Deltaic Sand/Shale Sequences</span>
+                    <span class="material-tag fluid-water">■ Kaolinitic Mud Clays</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="panel-title">Inverse Model Resistivity Tomography</div>
+                <div class="canvas-container">
+                    <canvas id="geologyCanvas" width="800" height="220"></canvas>
+                </div>
+                <div class="legend-bar"></div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.7rem; font-family: monospace; color: var(--text-muted);">
+                    <span>🔵 Low Res (&lt;15 Ω·m)<br><b>Marine Silt, Saline Water, Clays</b></span>
+                    <span>🟢 Mid Res (50-150 Ω·m)<br><b>Unconsolidated Saturated Sands</b></span>
+                    <span>🔴 High Res (&gt;350 Ω·m)<br><b>Dense Basement Rock / Bedrock</b></span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="rock-section-title">
+        <h2 style="font-size: 1.5rem; color: #fff;">Geological Baseline Dataset: Rock Matrix Catalog</h2>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">Key lithological formations encountered during near-surface and engineering evaluations</p>
+    </div>
+
+    <div class="rock-grid">
+        <div class="rock-card">
+            <div class="rock-image-container">
+                <img src="https://images.unsplash.com/photo-1590055531713-33e387c93cb0?auto=format&fit=crop&w=600&q=80" alt="Basalt Specimen">
+            </div>
+            <div class="rock-info">
+                <span class="rock-type-badge" style="background: rgba(255, 71, 87, 0.2); color: var(--accent-crimson);">Igneous (Extrusive)</span>
+                <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem;">Basalt</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted);">Fine-grained, dark volcanic rock rich in iron and magnesium. Composes most of the oceanic crust framework.</p>
+                <div class="use-box"><b>Engineering Use:</b> High-strength aggregate for subsea pipeline armoring, concrete reinforcement, and road foundations.</div>
+            </div>
+        </div>
+
+        <div class="rock-card">
+            <div class="rock-image-container">
+                <img src="https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=600&q=80" alt="Granite Specimen">
+            </div>
+            <div class="rock-info">
+                <span class="rock-type-badge" style="background: rgba(255, 71, 87, 0.2); color: var(--accent-crimson);">Igneous (Intrusive)</span>
+                <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem;">Granite</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted);">Coarse-grained plutonic rock rich in quartz and feldspar. Forms the deep, unyielding structural basement blocks.</p>
+                <div class="use-box"><b>Engineering Use:</b> Heavy-duty structural columns, breakwater riprap blocks to prevent coastal erosion.</div>
+            </div>
+        </div>
+
+        <div class="rock-card">
+            <div class="rock-image-container">
+                <img src="https://images.unsplash.com/photo-1576086213369-97a306d36557?auto=format&fit=crop&w=600&q=80" alt="Sandstone Specimen">
+            </div>
+            <div class="rock-info">
+                <span class="rock-type-badge" style="background: rgba(255, 159, 67, 0.2); color: var(--accent-amber);">Sedimentary (Clastic)</span>
+                <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem;">Sandstone</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted);">Compacted silicate sand grains. Possesses high porosity and permeability channels across sedimentary basins.</p>
+                <div class="use-box"><b>Engineering Use:</b> Ideal reservoir matrix for groundwater aquiferous systems and petroleum trap storage systems.</div>
+            </div>
+        </div>
+
+        <div class="rock-card">
+            <div class="rock-image-container">
+                <img src="https://images.unsplash.com/photo-1614064641938-3bbee52942c7?auto=format&fit=crop&w=600&q=80" alt="Shale/Claystone Specimen">
+            </div>
+            <div class="rock-info">
+                <span class="rock-type-badge" style="background: rgba(255, 159, 67, 0.2); color: var(--accent-amber);">Sedimentary (Fissile)</span>
+                <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem;">Shale</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted);">Fine-grained rock consolidated from mud and clay minerals. Highly impermeable layer exhibiting low electrical resistivity.</p>
+                <div class="use-box"><b>Engineering Use:</b> Functions as the perfect source rock and sealing cap layer to prevent fluid migration.</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        const geoPresets = {
+            niger: {
+                name: "Niger Delta Onshore Basin",
+                coords: [5.3100, 6.4400],
+                materials: [
+                    { name: "Freshwater Aquifers", type: "fluid-water" },
+                    { name: "Deltaic Alternating Sand/Shale Sequences", type: "fluid-oil" },
+                    { name: "Kaolinitic Mud Clays", type: "fluid-water" }
+                ]
+            },
+            gulf: {
+                name: "Gulf of Guinea (Offshore)",
+                coords: [4.7500, 7.0000],
+                materials: [
+                    { name: "Crude Hydrocarbons", type: "fluid-oil" },
+                    { name: "Saline Pore-Fluids", type: "fluid-water" },
+                    { name: "Unconsolidated Marine Silts", type: "fluid-water" },
+                    { name: "Shallow Pocket Biogenic Methane", type: "hazard-gas" }
+                ]
+            },
+            anambra: {
+                name: "Anambra Sedimentary Basin",
+                coords: [6.3000, 7.0000],
+                materials: [
+                    { name: "Subsurface Lignite / Coal Seams", type: "fluid-oil" },
+                    { name: "Consolidated Structural Sandstone Layers", type: "fluid-water" },
+                    { name: "Fissile Marine Shales", type: "hazard-gas" }
+                ]
+            }
+        };
+
+        let map, targetMarker;
+        const canvas = document.getElementById('geologyCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function initDashboard() {
+            // Start default centered over the Niger Delta coordinates
+            map = L.map('map', { attributionControl: false }).setView([5.3100, 6.4400], 8);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+            targetMarker = L.marker([5.3100, 6.4400]).addTo(map);
+            
+            drawEmptyCanvas();
+        }
+
+        function drawEmptyCanvas() {
+            ctx.fillStyle = "#04090d";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "rgba(255,255,255,0.4)";
+            ctx.font = "13px monospace";
+            ctx.fillText("Click 'Run Exploration Scan' to Compute Inversion Profiling...", canvas.width/2 - 210, canvas.height/2);
+        }
+
+        function updatePresetLocation() {
+            const key = document.getElementById('environmentSelect').value;
+            const data = geoPresets[key];
+            document.getElementById('targetCoords').value = `${data.coords[0].toFixed(4)}, ${data.coords[1].toFixed(4)}`;
+        }
+
+        function executeGeologicalInversion() {
+            const coordString = document.getElementById('targetCoords').value;
+            // Clean out quote anomalies if any are present
+            const cleanCoords = coordString.replace(/["']/g, '');
+            const parts = cleanCoords.split(',');
+            
+            if (parts.length !== 2) {
+                alert("Please make sure coordinates are comma separated. Example: 5.3100, 6.4400");
+                return;
+            }
+
+            const lat = parseFloat(parts[0].trim());
+            const lon = parseFloat(parts[1].trim());
+
+            if (isNaN(lat) || isNaN(lon)) {
+                alert("Invalid numerical coordinate data. Please verify inputs.");
+                return;
+            }
+
+            // Move Map Pin live
+            map.setView([lat, lon], 9);
+            targetMarker.setLatLng([lat, lon]);
+
+            const selectedKey = document.getElementById('environmentSelect').value;
+            const currentPreset = geoPresets[selectedKey];
+
+            document.getElementById('meta-env').innerText = currentPreset.name;
+            document.getElementById('meta-material').innerText = currentPreset.materials[0].name;
+            document.getElementById('scan-status').innerText = "Inversion Matrix Computing...";
+
+            // Redraw materials
+            const container = document.getElementById('materialsContainer');
+            container.innerHTML = '';
+            currentPreset.materials.forEach(m => {
+                const tag = document.createElement('span');
+                tag.className = `material-tag ${m.type}`;
+                tag.innerText = `■ ${m.name}`;
+                container.appendChild(tag);
+            });
+
+            // Run Tomography Wave Animation on Canvas
+            let frame = 0;
+            const maxFrames = 25;
+            const seedValue = Math.floor(lat + lon) % 5;
+
+            const scanInterval = setInterval(() => {
+                frame++;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                for (let x = 0; x < canvas.width; x += 4) {
+                    for (let y = 0; y < canvas.height; y += 4) {
+                        let baseWave = Math.sin(x * 0.01 + seedValue) * Math.cos(y * 0.04) * 30;
+                        let continuousDepth = y + baseWave;
+
+                        if (Math.abs((x - y * 1.2) - (canvas.width / 2.5)) < 25) {
+                            continuousDepth += (frame * 2.0);
+                        }
+
+                        let layerColor = '#aa00ff'; 
+                        if (continuousDepth < 45) layerColor = '#0022ff';      
+                        else if (continuousDepth < 85) layerColor = '#00ffcc'; 
+                        else if (continuousDepth < 125) layerColor = '#77ff00';
+                        else if (continuousDepth < 165) layerColor = '#ffff00';
+                        else if (continuousDepth < 195) layerColor = '#ff7700';
+                        else layerColor = '#ff0000';
+
+                        ctx.fillStyle = layerColor;
+                        ctx.fillRect(x, y, 4, 4);
+                    }
+                }
+
+                ctx.fillStyle = "rgba(255,255,255,0.9)";
+                ctx.font = "11px monospace";
+                ctx.fillText(`ERT INVERSION RUNNING // Iteration: ${frame} // Converged RMS Error: ${(22.1 - (frame*0.7)).toFixed(1)}%`, 15, 25);
+
+                if (frame >= maxFrames) {
+                    clearInterval(scanInterval);
+                    document.getElementById('scan-status').innerText = "Scan Finalized";
+                }
+            }, 40);
+        }
+
+        setInterval(() => {
+            const date = new Date();
+            document.getElementById('clock').innerText = date.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+        }, 1000);
+
+        window.onload = initDashboard;
+    </script>
+</body>
+</html>
+
